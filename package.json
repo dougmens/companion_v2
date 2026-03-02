@@ -18,7 +18,8 @@
     "intent:apply": "node src/cli.js admin intent:apply",
     "intent:apply-v2": "node src/cli.js admin intent:apply-v2",
     "events:tail": "node src/cli.js admin events:tail",
-    "test": "node --test"
+    "test": "node --test",
+    "registry:rebuild": "node src/cli.js registry:rebuild"
   },
   "dependencies": {
     "openai": "^4.0.0",
