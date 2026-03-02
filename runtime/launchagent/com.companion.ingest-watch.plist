@@ -3,26 +3,31 @@
  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key>
-  <string>com.companion.ingest-watch</string>
 
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/zsh</string>
-    <string>-lc</string>
-    <string>cd ~/Documents/Companion && npm run ingest:watch</string>
-  </array>
+    <key>Label</key>
+    <string>com.companion.ingest-watch</string>
 
-  <key>RunAtLoad</key>
-  <true/>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/andreasschonlein/Documents/Companion/src/cli.js</string>
+        <string>ingest:watch</string>
+    </array>
 
-  <key>KeepAlive</key>
-  <true/>
+    <key>WorkingDirectory</key>
+    <string>/Users/andreasschonlein/Documents/Companion</string>
 
-  <key>StandardOutPath</key>
-  <string>~/Documents/Companion/90_logs/ingest-watch.log</string>
+    <key>RunAtLoad</key>
+    <true/>
 
-  <key>StandardErrorPath</key>
-  <string>~/Documents/Companion/90_logs/ingest-watch.log</string>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/andreasschonlein/Documents/Companion/90_logs/ingest-watch.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/andreasschonlein/Documents/Companion/90_logs/ingest-watch.log</string>
+
 </dict>
 </plist>
