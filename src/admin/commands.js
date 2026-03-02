@@ -1,5 +1,6 @@
 const path = require("node:path");
 const fs = require("node:fs");
+const { spawn } = require("node:child_process");
 
 const { ingestOnce, ingestWatch } = require("../lib/ingest");
 const { runIngestRetry } = require("../lib/ingest_retry");
@@ -79,6 +80,80 @@ function eventRef(event, filePath) {
   };
 }
 
+function normalizeIntentEvents(result) {
+  if (result && Array.isArray(result.events) && result.events.length > 0) {
+    return result.events;
+  }
+  if (result?.event) {
+    return [{ event: result.event, filePath: result.eventFile || null }];
+  }
+  return [];
+}
+
+function deriveRegistryChange(event) {
+  const type = String(event?.type || "");
+  const payload = event?.payload && typeof event.payload === "object" ? event.payload : {};
+  if (type === "CASE_CREATED") {
+    return { type: "case:add", case_id: payload.case_id || event?.entity_id || null };
+  }
+  if (type === "CASE_UPDATED") {
+    return { type: "case:update", case_id: payload.case_id || event?.entity_id || null };
+  }
+  if (type === "CASE_MERGED") {
+    return {
+      type: "case:merge",
+      from: payload.from || null,
+      to: payload.to || null,
+    };
+  }
+  if (type === "CASE_STATUS_CHANGED") {
+    return {
+      type: "case:status",
+      case_id: payload.case_id || event?.entity_id || null,
+      status: payload.status || null,
+    };
+  }
+  if (type === "CASE_ARCHIVED") {
+    return {
+      type: "case:status",
+      case_id: payload.case_id || event?.entity_id || null,
+      status: "archived",
+    };
+  }
+  return null;
+}
+
+function deriveRegistryChangesFromEvents(eventEntries) {
+  const out = [];
+  for (const item of eventEntries || []) {
+    const change = deriveRegistryChange(item?.event);
+    if (!change) continue;
+    out.push(change);
+  }
+  return out;
+}
+
+async function runRegistryRebuildViaAdminCli() {
+  const cliPath = path.join(__dirname, "..", "cli.js");
+  await new Promise((resolve, reject) => {
+    const cp = spawn(
+      process.execPath,
+      [cliPath, "admin", "registry:rebuild"],
+      { cwd: process.cwd(), stdio: ["ignore", "ignore", "pipe"] },
+    );
+    let stderr = "";
+    cp.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    cp.on("error", reject);
+    cp.on("close", (code) => {
+      if (code === 0) return resolve();
+      const details = stderr.trim() ? `: ${stderr.trim()}` : "";
+      reject(new Error(`registry:rebuild failed (exit ${code})${details}`));
+    });
+  });
+}
+
 async function writeReportAndLog(report) {
   const { reportPath } = await writeIntentReport(report);
   await appendRuntimeSummaryLine({
@@ -112,25 +187,29 @@ async function cmdIntentApply(argv) {
   try {
     raw = await readJson(path.resolve(intentPath));
     res = await applyIntent(raw, { eventSource: "intent:apply" });
-    const registry_changes = [];
-    if (res?.result?.added) registry_changes.push({ type: "case:add", case_id: res.result.added });
-    if (res?.result?.updated) registry_changes.push({ type: "case:update", case_id: res.result.updated });
+    const intentEvents = normalizeIntentEvents(res);
+    const registry_changes = deriveRegistryChangesFromEvents(intentEvents);
+    const events_written = intentEvents.map((item) => eventRef(item.event, item.filePath));
+
+    await runRegistryRebuildViaAdminCli();
 
     report = buildReport({
       intent_id: res.intent.id,
       status: "applied",
       applied_actions: [res.intent.action],
-      events_written: [eventRef(res.event, res.eventFile)],
+      events_written,
       registry_changes,
     });
   } catch (error) {
+    const intentEvents = normalizeIntentEvents(res);
+    const registry_changes = deriveRegistryChangesFromEvents(intentEvents);
     const intent_id = raw?.id ? String(raw.id) : `intent_error_${Date.now()}`;
     report = buildReport({
       intent_id,
       status: "error",
       applied_actions: ["intent:apply"],
-      events_written: [],
-      registry_changes: [],
+      events_written: intentEvents.map((item) => eventRef(item.event, item.filePath)),
+      registry_changes,
       errors: [String(error?.message || error)],
     });
     await writeReportAndLog(report);
@@ -192,20 +271,18 @@ async function cmdIntentApplyV2(argv) {
     payload: processedEventPayload,
   });
 
-  const events_written = [eventRef(processed.event, processed.filePath)];
-  const registry_changes = [];
+  const eventEntries = [{ event: processed.event, filePath: processed.filePath }];
   const applied_actions = [`v2:${v2.type}`];
   const warnings = [];
   const errors = [];
 
-  let internalRes = null;
   if (mapping.decision === "mapped") {
     applied_actions.push(mapping.internal.action);
     try {
-      internalRes = await applyIntent(mapping.internal, { eventSource: "intent:apply-v2" });
-      events_written.push(eventRef(internalRes.event, internalRes.eventFile));
-      if (internalRes?.result?.added) registry_changes.push({ type: "case:add", case_id: internalRes.result.added });
-      if (internalRes?.result?.updated) registry_changes.push({ type: "case:update", case_id: internalRes.result.updated });
+      const internalRes = await applyIntent(mapping.internal, { eventSource: "intent:apply-v2" });
+      for (const item of normalizeIntentEvents(internalRes)) {
+        eventEntries.push(item);
+      }
     } catch (error) {
       errors.push(String(error?.message || error));
     }
@@ -216,9 +293,21 @@ async function cmdIntentApplyV2(argv) {
     if (mapping.reason) errors.push(mapping.reason);
   }
 
+  let reportStatus = errors.length > 0 && status !== "rejected" ? "error" : status;
+  if (reportStatus === "applied") {
+    try {
+      await runRegistryRebuildViaAdminCli();
+    } catch (error) {
+      errors.push(String(error?.message || error));
+      reportStatus = "error";
+    }
+  }
+
+  const registry_changes = deriveRegistryChangesFromEvents(eventEntries);
+  const events_written = eventEntries.map((item) => eventRef(item.event, item.filePath));
   const report = buildReport({
     intent_id: v2.id,
-    status: errors.length > 0 && status !== "rejected" ? "error" : status,
+    status: reportStatus,
     applied_actions,
     events_written,
     registry_changes,
@@ -246,11 +335,17 @@ async function cmdRegistryRebuild() {
   if (fs.existsSync(eventsDir)) {
     const files = fs
       .readdirSync(eventsDir)
-      .filter((file) => file.endsWith(".jsonl"));
+      .filter((file) => file.endsWith(".jsonl"))
+      .sort();
 
     for (const file of files) {
       const filePath = path.join(eventsDir, file);
-      const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+      let lines = [];
+      try {
+        lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+      } catch {
+        continue;
+      }
       for (const line of lines) {
         if (!line) continue;
         try {
@@ -265,7 +360,15 @@ async function cmdRegistryRebuild() {
   events = events.sort((a, b) => {
     const left = new Date(a?.ts ?? 0).getTime() || 0;
     const right = new Date(b?.ts ?? 0).getTime() || 0;
-    return left - right;
+    if (left !== right) return left - right;
+
+    const leftId = String(a?.id || "");
+    const rightId = String(b?.id || "");
+    if (leftId !== rightId) return leftId.localeCompare(rightId);
+
+    const leftType = String(a?.type || "");
+    const rightType = String(b?.type || "");
+    return leftType.localeCompare(rightType);
   });
 
   const registry = rebuildRegistryFromEvents(events);
