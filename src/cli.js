@@ -10,6 +10,11 @@ function usage() {
 }
 
 async function routeLegacyCommand(firstArg, restArgs) {
+  if (firstArg === "registry:rebuild") {
+    usage();
+    process.exitCode = 1;
+    return null;
+  }
   if (isFachCommand(firstArg)) {
     // eslint-disable-next-line no-console
     console.warn(`[router] Legacy command form detected. Use: node src/cli.js fach ${firstArg}`);
