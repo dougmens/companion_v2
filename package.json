@@ -19,7 +19,10 @@
     "intent:apply-v2": "node src/cli.js admin intent:apply-v2",
     "events:tail": "node src/cli.js admin events:tail",
     "test": "node --test",
-    "registry:rebuild": "node src/cli.js admin registry:rebuild"
+    "registry:rebuild": "node src/cli.js admin registry:rebuild",
+    "ui:export": "node src/export/dashboard_export.js",
+    "ui:sync": "node src/export/dashboard_sync.js",
+    "ui:build": "node src/export/ui_build_runner.js"
   },
   "dependencies": {
     "openai": "^4.0.0",
