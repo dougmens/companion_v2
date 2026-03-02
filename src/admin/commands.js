@@ -1,4 +1,5 @@
 const path = require("node:path");
+const fs = require("node:fs");
 
 const { ingestOnce, ingestWatch } = require("../lib/ingest");
 const { runIngestRetry } = require("../lib/ingest_retry");
@@ -13,6 +14,7 @@ const { readJson, writeJson } = require("../lib/fsx");
 const { normalizeV2, validateV2, mapV2ToInternal } = require("../lib/intent_v2");
 const { appendRuntimeSummaryLine, writeIntentReport } = require("../lib/runtime_reports");
 const { applyIntent } = require("../lib/intents");
+const { rebuildRegistryFromEvents } = require("../projection/registryProjector");
 
 function parseArgs(argv) {
   const args = {};
@@ -37,6 +39,7 @@ function usage() {
   node src/cli.js admin intent:apply <intent.json>
   node src/cli.js admin intent:apply-v2 <intent_v2.json>
   node src/cli.js admin events:tail [--n 20]
+  node src/cli.js admin registry:rebuild
   node src/cli.js admin rag:rebuild [--mock-embeddings] [--domain <global|jur|fin|allg|familienrecht|strafrecht|verwaltungsrecht|versicherungsrecht|mietrecht>]
   node src/cli.js admin system:doctor [--strict] [--quick] [--run-tests] [--write-probe]
   node src/cli.js admin system:mode --set <test|staged>
@@ -236,6 +239,45 @@ async function cmdEventsTail(argv) {
   console.log(JSON.stringify(res, null, 2));
 }
 
+async function cmdRegistryRebuild() {
+  const eventsDir = path.join(process.cwd(), "50_events");
+  let events = [];
+
+  if (fs.existsSync(eventsDir)) {
+    const files = fs
+      .readdirSync(eventsDir)
+      .filter((file) => file.endsWith(".jsonl"));
+
+    for (const file of files) {
+      const filePath = path.join(eventsDir, file);
+      const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+      for (const line of lines) {
+        if (!line) continue;
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+          // ignore invalid JSON lines
+        }
+      }
+    }
+  }
+
+  events = events.sort((a, b) => {
+    const left = new Date(a?.ts ?? 0).getTime() || 0;
+    const right = new Date(b?.ts ?? 0).getTime() || 0;
+    return left - right;
+  });
+
+  const registry = rebuildRegistryFromEvents(events);
+  fs.writeFileSync(
+    path.join(process.cwd(), "case_registry.json"),
+    JSON.stringify(registry, null, 2),
+    "utf8",
+  );
+  // eslint-disable-next-line no-console
+  console.log("Registry rebuilt from events.");
+}
+
 async function cmdRagRebuild(argv) {
   const args = parseArgs(argv);
   const domainScope = args.domain || args.scope || null;
@@ -381,6 +423,7 @@ const ADMIN_COMMANDS = new Set([
   "intent:apply",
   "intent:apply-v2",
   "events:tail",
+  "registry:rebuild",
   "rag:rebuild",
   "system:doctor",
   "system:mode",
@@ -405,6 +448,7 @@ async function runAdminCommand(cmd, argv) {
   if (cmd === "intent:apply") return cmdIntentApply(argv);
   if (cmd === "intent:apply-v2") return cmdIntentApplyV2(argv);
   if (cmd === "events:tail") return cmdEventsTail(argv);
+  if (cmd === "registry:rebuild") return cmdRegistryRebuild();
   if (cmd === "rag:rebuild") return cmdRagRebuild(argv);
   if (cmd === "system:doctor") return cmdSystemDoctor(argv);
   if (cmd === "system:mode") return cmdSystemMode(argv);
