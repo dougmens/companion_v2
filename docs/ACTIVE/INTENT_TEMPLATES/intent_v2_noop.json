@@ -1,0 +1,12 @@
+{
+  "schema": "companion-json-v2",
+  "id": "intent_noop_001",
+  "ts": "2026-02-24T00:00:00Z",
+  "type": "SHOW_DASHBOARD",
+  "payload": {
+    "note": "Event-only intent (no local side effects in phase 1)."
+  },
+  "source": "chatgpt-ui",
+  "status": "new"
+}
+

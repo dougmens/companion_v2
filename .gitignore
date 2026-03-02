@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log*
+
+90_logs/
+40_rag_index/
+
+10_processed/
+20_markdown/
+30_metadata/
+
+50_events/
+60_intents/
+70_runtime/
+80_export/

@@ -1,0 +1,17 @@
+{
+  "schema": "companion-json-v2",
+  "id": "intent_case_update_001",
+  "ts": "2026-02-24T00:00:00Z",
+  "type": "UPDATE_DASHBOARD_DATA",
+  "payload": {
+    "registry_case_update": {
+      "case_id": "My_Case_1",
+      "title": "Updated Case Title",
+      "aliases": ["alias1", "alias2", "alias3"],
+      "tags": ["tag1", "tag2", "tag3"]
+    }
+  },
+  "source": "chatgpt-ui",
+  "status": "new"
+}
+

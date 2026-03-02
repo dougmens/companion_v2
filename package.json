@@ -1,0 +1,27 @@
+{
+  "name": "companion-doc-ingest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "fach": "node src/cli.js fach",
+    "admin": "node src/cli.js admin",
+    "ingest:watch": "node src/cli.js admin ingest:watch",
+    "ingest:once": "node src/cli.js admin ingest:once",
+    "rag:rebuild": "node src/cli.js admin rag:rebuild",
+    "case:list": "node src/cli.js fach case:list",
+    "case:add": "node src/cli.js fach case:add",
+    "case:merge": "node src/cli.js fach case:merge",
+    "intent:apply": "node src/cli.js admin intent:apply",
+    "intent:apply-v2": "node src/cli.js admin intent:apply-v2",
+    "events:tail": "node src/cli.js admin events:tail",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "openai": "^4.0.0",
+    "pdf-parse": "^1.1.1"
+  }
+}
