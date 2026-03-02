@@ -1,11 +1,9 @@
 {
   "version": "local-v1",
   "mode": "staged",
-  "health_status": "blocked",
-  "blockers": [
-    "LaunchAgent service not running"
-  ],
-  "watcher_configured": false,
+  "health_status": "ok",
+  "blockers": [],
+  "watcher_configured": true,
   "watcher_launchagent_template_available": true,
   "reset_required_before_go_live": false,
   "last_successful_ingest": "2026-02-24T18:17:51.795Z",
@@ -16,10 +14,7 @@
     "fin": "_builds/20260302T011758Z",
     "allg": "_builds/20260302T011758Z"
   },
-  "notes": "Hybrid Runtime Layer aktiv: 50_events/ (Events), 60_intents/ (Intents), 70_runtime/ (State), 80_export/ (Exports). Watcher ist aktuell manuell (npm run ingest:watch); LaunchAgent Template unter runtime/launchagent/. Notion/MCP/Phase-3 ist archiviert/inoffiziell und nicht Teil des aktiven Setups.",
   "rag_index_current_strafrecht": "_builds/20260302T010257Z",
   "rag_index_current_updated_at": "2026-03-02T01:18:29.571Z",
-  "rag_index_current_jur": "_builds/20260302T011758Z",
-  "rag_index_current_fin": "_builds/20260302T011758Z",
-  "rag_index_current_allg": "_builds/20260302T011758Z"
+  "notes": "Hybrid Runtime Layer aktiv: 50_events/ (Events), 60_intents/ (Intents), 70_runtime/ (State), 80_export/ (Exports). Watcher läuft als LaunchAgent."
 }
