@@ -11,4 +11,10 @@ npm-debug.log*
 50_events/
 60_intents/
 70_runtime/
+
+
+# generated snapshots / exports
+case_registry.json
 80_export/
+ui/public/dashboard_state.json
+ui/dist/
